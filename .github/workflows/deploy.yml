@@ -1,0 +1,79 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: nitin03/yii2demo
+      SERVICE_NAME: yiiapp_php
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Validate required secrets
+      run: |
+        if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ] || [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
+          echo "Required secrets are missing. Exiting."
+          exit 1
+        fi
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image with cache and latest tag
+      env:
+        DOCKER_BUILDKIT: 1
+      run: |
+        TAG=v${{ github.run_number }}
+
+        # Attempt to pull latest image for build cache, ignore errors if none exists
+        docker pull $IMAGE_NAME:latest || echo "No cache image found, proceeding without cache"
+
+        # Build with cache-from latest
+        docker build --cache-from $IMAGE_NAME:latest -f Dockerfile.prod -t $IMAGE_NAME:$TAG .
+
+        # Push the new tagged image
+        docker push $IMAGE_NAME:$TAG
+
+        # Tag and push latest to update cache for next build and convenience
+        docker tag $IMAGE_NAME:$TAG $IMAGE_NAME:latest
+        docker push $IMAGE_NAME:latest
+
+    - name: Deploy to EC2 with rollback on failure
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          TAG=v${{ github.run_number }}
+          SERVICE_NAME=$SERVICE_NAME
+          IMAGE_NAME=$IMAGE_NAME
+
+          echo "Fetching current image for service $SERVICE_NAME..."
+          CURRENT_IMAGE=$(docker service inspect --format='{{index .Spec.TaskTemplate.ContainerSpec.Image}}' $SERVICE_NAME || echo "")
+          echo "Current image: $CURRENT_IMAGE"
+
+          echo "Updating service to use image: $IMAGE_NAME:$TAG"
+          if docker service update --image $IMAGE_NAME:$TAG $SERVICE_NAME; then
+            echo "Service updated successfully to $IMAGE_NAME:$TAG"
+          else
+            echo "Service update failed! Attempting rollback..."
+            if [ -n "$CURRENT_IMAGE" ]; then
+              docker service update --image $CURRENT_IMAGE $SERVICE_NAME
+              echo "Rollback to $CURRENT_IMAGE completed."
+            else
+              echo "No previous image found, cannot rollback."
+            fi
+            exit 1
+          fi
