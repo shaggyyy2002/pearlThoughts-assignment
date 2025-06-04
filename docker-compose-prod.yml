@@ -1,0 +1,9 @@
+services:
+  php:
+    image: nitin03/yii2demo:v2
+    ports:
+      - '8000:80'
+    environment:
+      - APACHE_DOCUMENT_ROOT=/app/web
+      - YII_ENV=prod
+      - YII_DEBUG=0

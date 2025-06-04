@@ -1,0 +1,24 @@
+#Builder
+FROM yiisoftware/yii2-php:7.4-apache as builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y \
+    curl unzip git \
+    && curl -sS https://getcomposer.org/installer | php && \
+    mv composer.phar /usr/local/bin/composer && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY composer.json composer.lock /app/
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+COPY . /app
+RUN chown -R www-data:www-data /app/runtime /app/web/assets && \
+    chmod -R 775 /app/runtime /app/web/assets
+
+# 2nd part
+FROM yiisoftware/yii2-php:7.4-apache
+
+WORKDIR /app
+COPY --from=builder /app /app
+RUN chown -R www-data:www-data /app/runtime /app/web/assets
+ENV APACHE_DOCUMENT_ROOT=/app/web
+EXPOSE 80
+
