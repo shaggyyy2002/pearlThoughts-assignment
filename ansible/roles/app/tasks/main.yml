@@ -1,4 +1,10 @@
 ---
+- name: Ensure git is installed
+  package:
+    name: git
+    state: present
+  become: yes
+  
 - name: Check if app directory exists before deploy
   stat:
     path: /home/ec2-user/pearlthoughts-assignment
