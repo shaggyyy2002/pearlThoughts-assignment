@@ -31,3 +31,9 @@ tests/_support/_generated
 
 #vagrant folder
 /.vagrant
+
+*.pem
+*.retry
+*.log
+__pycache__/
+.cache/

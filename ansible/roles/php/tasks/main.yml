@@ -1,0 +1,21 @@
+---
+- name: Install PHP
+  yum:
+    name:
+      - php
+      - php-fpm
+      - php-mbstring
+      - php-mysqlnd
+      - php-xml
+      - php-curl
+      - php-gd
+      - git
+    state: present
+  become: yes
+
+- name: Ensure php-fpm service is enabled and started
+  service:
+    name: php-fpm
+    state: started
+    enabled: yes
+  become: yes

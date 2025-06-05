@@ -1,0 +1,27 @@
+---
+- name: Check if app directory exists before deploy
+  stat:
+    path: /home/ec2-user/pearlthoughts-assignment
+  register: app_dir
+
+- name: Fail if app directory does not exist
+  fail:
+    msg: "/home/ec2-user/pearlthoughts-assignment directory not found!"
+  when: not app_dir.stat.exists
+
+- name: Clone Yii2 app repo if not present
+  git:
+    repo: 'https://github.com/shaggyyy2002/pearlThoughts-assignment.git'   # Change to your repo URL
+    dest: /home/ec2-user/pearlthoughts-assignment
+    version: main
+    update: yes
+  when: not app_dir.stat.exists
+  become: yes
+  become_user: ec2-user
+
+- name: Deploy Yii2 app as Docker Swarm service
+  command: docker stack deploy -c docker-compose-prod.yml yiiapp
+  args:
+    chdir: /home/ec2-user/pearlthoughts-assignment
+  become: yes
+  become_user: ec2-user

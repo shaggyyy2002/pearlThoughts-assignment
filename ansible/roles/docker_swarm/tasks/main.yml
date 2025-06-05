@@ -1,0 +1,29 @@
+---
+- name: Check if Docker Swarm is already initialized
+  command: docker info --format '{{"{{.Swarm.LocalNodeState}}"}}'
+  register: swarm_status
+  changed_when: false
+  failed_when: false
+
+- name: Debug Swarm status output
+  debug:
+    var: swarm_status.stdout
+
+- name: Get Docker Swarm join token for worker
+  command: docker swarm join-token -q worker
+  register: worker_join_token
+  changed_when: false
+  when: "'active' in swarm_status.stdout"
+
+- name: Get Docker Swarm join token for manager
+  command: docker swarm join-token -q manager
+  register: manager_join_token
+  changed_when: false
+  when: "'active' in swarm_status.stdout"
+
+- name: Show Swarm join tokens
+  debug:
+    msg:
+      - "Worker join token: {{ worker_join_token.stdout }}"
+      - "Manager join token: {{ manager_join_token.stdout }}"
+  when: "'active' in swarm_status.stdout"

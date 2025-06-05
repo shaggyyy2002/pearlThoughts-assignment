@@ -1,0 +1,23 @@
+---
+- name: Install NGINX
+  yum:
+    name: nginx
+    state: present
+  become: yes
+
+- name: Copy NGINX config file
+  template:
+    src: default.conf.j2
+    dest: /etc/nginx/conf.d/default.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+  become: yes
+
+- name: Ensure NGINX is running and enabled
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+  become: yes
